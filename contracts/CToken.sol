@@ -29,7 +29,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
                         string memory symbol_,
                         uint8 decimals_) public {
         require(msg.sender == admin, "only admin may initialize the market");
-        require(accrualBlockNumber == 0 && borrowIndex == 0, "market may only be initialized once");
+        require(accrualBlockTimestamp == 0 && borrowIndex == 0, "market may only be initialized once");
 
         // Set initial exchange rate
         initialExchangeRateMantissa = initialExchangeRateMantissa_;
@@ -40,7 +40,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         require(err == uint(Error.NO_ERROR), "setting comptroller failed");
 
         // Initialize block number and borrow index (block number mocks depend on comptroller being set)
-        accrualBlockNumber = getBlockNumber();
+        accrualBlockTimestamp = getBlockTimestamp();
         borrowIndex = mantissaOne;
 
         // Set the interest rate model (depends on block number / borrow index)
@@ -220,12 +220,16 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         return (uint(Error.NO_ERROR), cTokenBalance, borrowBalance, exchangeRateMantissa);
     }
 
-    /**
-     * @dev Function to simply retrieve block number
-     *  This exists mainly for inheriting test contracts to stub this result.
-     */
-    function getBlockNumber() internal view returns (uint) {
-        return block.number;
+    // /**
+    //  * @dev Function to simply retrieve block number
+    //  *  This exists mainly for inheriting test contracts to stub this result.
+    //  */
+    // function getBlockNumber() internal view returns (uint) {
+    //     return block.number;
+    // }
+
+    function getBlockTimestamp() internal view returns (uint) {
+        return block.timestamp;
     }
 
     /**
@@ -383,11 +387,11 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
      */
     function accrueInterest() public returns (uint) {
         /* Remember the initial block number */
-        uint currentBlockNumber = getBlockNumber();
-        uint accrualBlockNumberPrior = accrualBlockNumber;
+        uint currentBlockTimestamp = getBlockTimestamp();
+        uint accrualBlockTimestampPrior = accrualBlockTimestamp;
 
         /* Short-circuit accumulating 0 interest */
-        if (accrualBlockNumberPrior == currentBlockNumber) {
+        if (accrualBlockTimestampPrior == currentBlockTimestamp) {
             return uint(Error.NO_ERROR);
         }
 
@@ -402,7 +406,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         require(borrowRateMantissa <= borrowRateMaxMantissa, "borrow rate is absurdly high");
 
         /* Calculate the number of blocks elapsed since the last accrual */
-        (MathError mathErr, uint blockDelta) = subUInt(currentBlockNumber, accrualBlockNumberPrior);
+        (MathError mathErr, uint blockDelta) = subUInt(currentBlockTimestamp, accrualBlockTimestampPrior);
         require(mathErr == MathError.NO_ERROR, "could not calculate block delta");
 
         /*
@@ -450,7 +454,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         // (No safe failures beyond this point)
 
         /* We write the previously calculated values into storage */
-        accrualBlockNumber = currentBlockNumber;
+        accrualBlockTimestamp = currentBlockTimestamp;
         borrowIndex = borrowIndexNew;
         totalBorrows = totalBorrowsNew;
         totalReserves = totalReservesNew;
@@ -502,7 +506,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         /* Verify market's block number equals current block number */
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return (fail(Error.MARKET_NOT_FRESH, FailureInfo.MINT_FRESHNESS_CHECK), 0);
         }
 
@@ -657,7 +661,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         /* Verify market's block number equals current block number */
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return fail(Error.MARKET_NOT_FRESH, FailureInfo.REDEEM_FRESHNESS_CHECK);
         }
 
@@ -742,7 +746,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         /* Verify market's block number equals current block number */
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return fail(Error.MARKET_NOT_FRESH, FailureInfo.BORROW_FRESHNESS_CHECK);
         }
 
@@ -857,7 +861,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         /* Verify market's block number equals current block number */
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return (fail(Error.MARKET_NOT_FRESH, FailureInfo.REPAY_BORROW_FRESHNESS_CHECK), 0);
         }
 
@@ -960,12 +964,12 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         /* Verify market's block number equals current block number */
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return (fail(Error.MARKET_NOT_FRESH, FailureInfo.LIQUIDATE_FRESHNESS_CHECK), 0);
         }
 
         /* Verify cTokenCollateral market's block number equals current block number */
-        if (cTokenCollateral.accrualBlockNumber() != getBlockNumber()) {
+        if (cTokenCollateral.accrualBlockTimestamp() != getBlockTimestamp()) {
             return (fail(Error.MARKET_NOT_FRESH, FailureInfo.LIQUIDATE_COLLATERAL_FRESHNESS_CHECK), 0);
         }
 
@@ -1225,7 +1229,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         // Verify market's block number equals current block number
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return fail(Error.MARKET_NOT_FRESH, FailureInfo.SET_RESERVE_FACTOR_FRESH_CHECK);
         }
 
@@ -1271,7 +1275,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         uint actualAddAmount;
 
         // We fail gracefully unless market's block number equals current block number
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return (fail(Error.MARKET_NOT_FRESH, FailureInfo.ADD_RESERVES_FRESH_CHECK), actualAddAmount);
         }
 
@@ -1336,7 +1340,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         // We fail gracefully unless market's block number equals current block number
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return fail(Error.MARKET_NOT_FRESH, FailureInfo.REDUCE_RESERVES_FRESH_CHECK);
         }
 
@@ -1402,7 +1406,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         }
 
         // We fail gracefully unless market's block number equals current block number
-        if (accrualBlockNumber != getBlockNumber()) {
+        if (accrualBlockTimestamp != getBlockTimestamp()) {
             return fail(Error.MARKET_NOT_FRESH, FailureInfo.SET_INTEREST_RATE_MODEL_FRESH_CHECK);
         }
 

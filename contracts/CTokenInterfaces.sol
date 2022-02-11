@@ -69,7 +69,7 @@ contract CTokenStorage {
     /**
      * @notice Block number that interest was last accrued at
      */
-    uint public accrualBlockNumber;
+    uint public accrualBlockTimestamp;
 
     /**
      * @notice Accumulator of the total earned interest rate since the opening of the market
